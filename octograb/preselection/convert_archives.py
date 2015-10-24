@@ -14,7 +14,10 @@ __all__ = ['convert_archives']
 
 logger = octograb.utils.get_logger('PRESELECTION:CONVERT')
 
+
 # MAIN ========================================================================
+
+
 def convert_archives():
     logger.info('Initializing CONVERT_ARCHIVES.')
 
@@ -31,18 +34,21 @@ def convert_archives():
         _save_state(cur_date)
 
     logger.info('CONVERT_ARCHIVES finished.')
+
+
 # =============================================================================
 
 # HELPERS =====================================================================
+
+
 def _load_state():
     state_name = octograb.config['cache_dir'] + '/' + 'preselection.cache'
     date = None
-    
+
     logger.info('Trying do load state...')
     if os.path.isfile(state_name):
-        f = open(state_name, 'r')
-        date = cPickle.load(f)
-        f.close()
+        with open(state_name, 'r') as f:
+            date = cPickle.load(f)
         logger.info('... state loaded successfully.')
 
     else:
@@ -56,6 +62,7 @@ def _load_state():
 
     return date
 
+
 def _save_state(date):
     state_name = octograb.config['cache_dir'] + '/' + 'preselection.cache'
 
@@ -63,6 +70,7 @@ def _save_state(date):
     data = cPickle.dumps(date)
     octograb.utils.safe_save(data, state_name)
     logger.info('... state saved.')
+
 
 def _max_date():
     return datetime.datetime(
@@ -72,9 +80,10 @@ def _max_date():
         0
     )
 
+
 def _process_day(date):
     _name = date.strftime('%Y-%m-%d')
-    logger.info('Converting data for archive %s...'%_name)
+    logger.info('Converting data for archive %s...' % _name)
 
     dataset = octograb.models.ArchiveDataset()
     step = datetime.timedelta(hours=1)
@@ -90,12 +99,12 @@ def _process_day(date):
 
     # get all urls
     _base = _c['preselection']['archives_url'] + '/'
-    archive_urls  = [_base+n for n in archive_names]
-    
+    archive_urls = [_base+n for n in archive_names]
+
     # download them all
     for url, path, name in zip(archive_urls, archive_paths, archive_names):
-        logger.info('Downloading "%s"...'%name)
-        
+        logger.info('Downloading "%s"...' % name)
+
         # repeat until download is completed
         _download_complete = False
         while not _download_complete:
@@ -105,19 +114,20 @@ def _process_day(date):
 
             # handle connection error
             except (socket.error, requests.exceptions.ConnectionError) as e:
-                logger.error('Connection error, trying again after 15 seconds.')
+                logger.error('Connection error, trying again after 15'
+                             ' seconds.')
                 time.sleep(15)
 
         logger.info('... download completed.')
 
     # open them all
     for path, name in zip(archive_paths, archive_names):
-        logger.info('Processing "%s"...'%name)
+        logger.info('Processing "%s"...' % name)
         _process_file(path, dataset)
-        logger.info('... "%s" processed'%name)
+        logger.info('... "%s" processed' % name)
 
     # export dataset
-    logger.info('Exporting %s...'%_name)
+    logger.info('Exporting %s...' % _name)
     data = dataset.export()
     s = octograb.utils.archive_to_csv(data)
     octograb.utils.safe_save(s, _path+_name+'.csv', no_bkp=True)
@@ -130,26 +140,27 @@ def _process_day(date):
 
         # ignore if cant remove file
         except WindowsError as e:
-            logger.error('Could not remove "%s": "%s"'%(path, e.message))
+            logger.error('Could not remove "%s": "%s"' % (path, e.message))
 
-    logger.info('... archive %s converted.'%_name)
+    logger.info('... archive %s converted.' % _name)
+
 
 def _process_file(path, dataset):
-    f = gzip.open(path)
-    for line in f:
-        _process_event(line, dataset)
-    f.close()
+    with gzip.open(path) as f:
+        for line in f:
+            _process_event(line, dataset)
+
 
 def _process_event(line, dataset):
     # don't stop processing
     try:
-        data  = json.loads(line)
+        data = json.loads(line)
     except ValueError as e:
         logger.error(e.message)
         return
 
     type_ = data['type']
-    name  = data['repo']['name']
+    name = data['repo']['name']
 
     if type_ == 'WatchEvent':
         dataset.update(name, stars=1)
@@ -163,4 +174,6 @@ def _process_event(line, dataset):
 
     elif type_ == 'PullRequestEvent':
         dataset.update(name, pulls=1)
+
+
 # =============================================================================
