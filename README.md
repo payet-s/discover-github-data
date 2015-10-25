@@ -3,7 +3,7 @@
 Github repositories dataset and extraction app.
 
 
-## Requeriments:
+## Requirements:
 
 - pandas
 - requests
